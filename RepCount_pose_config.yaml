@@ -20,7 +20,7 @@ Action_trigger: {
   momentum: 0.4
 }
 trainer: {
-  max_epochs: 20,
+  max_epochs: 100,
   auto_lr_find: True,
   accelerator: 'gpu',
   devices: 1
