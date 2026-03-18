@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info
+
+# 가상환경
+venv/
+.venv/
+env/
+
+# 연구용 코드 (서비스에 불필요)
+research/
+*.ipynb
+
+# 개발 설정
+.env
+.env.local
+docker-compose.prod.yml
+nginx/
+
+# 불필요한 파일
+*.md
+*.bat
+*.log
+.DS_Store
+Thumbs.db

@@ -1,48 +1,14 @@
 services:
-  poserac-web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: poserac-exercise-counter
+  app:
+    build: .
+    container_name: gymapp
     ports:
-      - "8000:8000"  # FastAPI backend
-      - "8501:8501"  # Streamlit frontend
-    volumes:
-      # Mount model weights if they exist locally
-      - ./best_weights_PoseRAC.pth:/app/best_weights_PoseRAC.pth:ro
-      - ./new_weights.pth:/app/new_weights.pth:ro
-      # Mount saved_weights directory if it exists
-      - ./saved_weights:/app/saved_weights:ro
-      # Mount config file
-      - ./RepCount_pose_config.yaml:/app/RepCount_pose_config.yaml:ro
-      - ./all_action.csv:/app/all_action.csv:ro
-    environment:
-      - BACKEND_URL=http://localhost:8000
-      - PYTHONPATH=/app
+      - "8000:8000"
+    env_file: .env
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
-
-  # Optional: Add nginx for reverse proxy (uncomment if needed)
-  # nginx:
-  #   image: nginx:alpine
-  #   container_name: poserac-nginx
-  #   ports:
-  #     - "80:80"
-  #   volumes:
-  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
-  #   depends_on:
-  #     - poserac-web
-  #   restart: unless-stopped
-
-volumes:
-  model_data:
-    driver: local
-
-networks:
-  default:
-    name: poserac-network
+      start_period: 90s

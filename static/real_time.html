@@ -1,357 +1,716 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PoseRAC Real-Time Exercise Counter</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            padding: 30px;
-            backdrop-filter: blur(10px);
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        .main-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 30px;
-            align-items: start;
-        }
-        .video-section {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 10px;
-            padding: 20px;
-        }
-        .stats-section {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 10px;
-            padding: 20px;
-        }
-        #videoCanvas {
-            width: 100%;
-            max-width: 640px;
-            border-radius: 10px;
-            background: #000;
-        }
-        .stat-item {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 15px;
-            margin: 10px 0;
-            text-align: center;
-        }
-        .stat-value {
-            font-size: 2em;
-            font-weight: bold;
-            margin: 10px 0;
-        }
-        .stat-label {
-            font-size: 0.9em;
-            opacity: 0.8;
-        }
-        .controls {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
-            margin: 20px 0;
-        }
-        button {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            padding: 12px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s;
-        }
-        button:hover {
-            background: rgba(255, 255, 255, 0.3);
-            transform: translateY(-2px);
-        }
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .status {
-            text-align: center;
-            padding: 10px;
-            border-radius: 8px;
-            margin: 10px 0;
-        }
-        .status.connected {
-            background: rgba(0, 255, 0, 0.2);
-        }
-        .status.disconnected {
-            background: rgba(255, 0, 0, 0.2);
-        }
-        .instructions {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 15px;
-            margin: 20px 0;
-        }
-    </style>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <title>GymAI Rep Counter</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:#0d0d0d; --surface:#1a1a1a; --surface2:#242424;
+      --accent:#00e5ff; --accent2:#00ff88;
+      --warn:#ffb300; --danger:#ff4444;
+      --text:#f0f0f0; --dim:#888; --radius:14px;
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+      --safe-top:    env(safe-area-inset-top, 0px);
+      --ctrl-h: 68px;
+    }
+
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+      min-height: 100dvh;
+      display: flex; flex-direction: column;
+      overscroll-behavior: none;
+    }
+
+    /* ═══ 헤더 ═══ */
+    header {
+      padding: 12px 16px;
+      padding-top: calc(12px + var(--safe-top));
+      background: var(--surface);
+      display: flex; align-items: center; gap: 10px;
+      border-bottom: 1px solid #2a2a2a;
+      position: sticky; top: 0; z-index: 10;
+    }
+    header h1 { font-size: 1rem; font-weight: 700; color: var(--accent); }
+    .phase-badge {
+      margin-left: auto; padding: 4px 12px; border-radius: 20px;
+      font-size: .75rem; font-weight: 600;
+      background: var(--surface2); color: var(--accent); border: 1px solid var(--accent);
+      white-space: nowrap;
+    }
+
+    /* ═══ 스크롤 영역 ═══ */
+    main {
+      flex: 1; overflow-y: auto;
+      padding: 0 0 calc(var(--ctrl-h) + var(--safe-bottom) + 8px);
+      display: flex; flex-direction: column; gap: 0;
+    }
+
+    /* ═══ 카메라 ═══ */
+    .camera-wrap {
+      position: relative; width: 100%;
+      background: #000; aspect-ratio: 4/3;
+      /* 모바일: 전체 너비, 데스크톱: 둥근 모서리 */
+    }
+    @media (min-width: 640px) {
+      main { padding-left: 16px; padding-right: 16px; gap: 14px; }
+      main > *:first-child { margin-top: 16px; }
+      .camera-wrap { border-radius: var(--radius); overflow: hidden; }
+    }
+
+    #localCanvas, #serverCanvas {
+      position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    }
+    #serverCanvas { display: none; }
+
+    /* ═══ 감지 중 오버레이 ═══ */
+    .overlay {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      background: rgba(0,0,0,.65); pointer-events: none;
+    }
+    .overlay.hidden { display: none; }
+    .spinner {
+      width: 48px; height: 48px; border: 4px solid #333;
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin .9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .overlay-title { font-size: 1rem; font-weight: 600; }
+    .overlay-sub   { font-size: .82rem; color: var(--dim); text-align: center; padding: 0 24px; }
+    .detect-dots { display: flex; gap: 10px; }
+    .detect-dots span {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: #333; transition: background .3s;
+    }
+    .detect-dots span.active { background: var(--accent); }
+
+    /* ═══ 셋업 오버레이 ═══ */
+    #setupOverlay {
+      position: absolute; inset: 0; pointer-events: none;
+      display: flex; flex-direction: column; justify-content: flex-end;
+    }
+    #setupOverlay.hidden { display: none; }
+    .setup-bottom {
+      background: linear-gradient(transparent, rgba(0,0,0,.93));
+      padding: 36px 16px 14px;
+      display: flex; flex-direction: column; gap: 9px;
+    }
+    .setup-title-row {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 4px;
+    }
+    .setup-ex-name { font-size: .95rem; font-weight: 700; color: var(--accent); }
+    .setup-hint    { font-size: .72rem; color: var(--dim); }
+    .setup-bars    { display: flex; flex-direction: column; gap: 5px; }
+    .bar-row { display: flex; align-items: center; gap: 8px; }
+    .bar-lbl { font-size: .72rem; color: #aaa; width: 52px; flex-shrink: 0; }
+    .bar-pct { font-size: .72rem; color: #aaa; width: 34px; text-align: right; flex-shrink: 0; }
+    .prog-wrap {
+      flex: 1; height: 7px; background: rgba(255,255,255,.15);
+      border-radius: 4px; overflow: hidden;
+    }
+    .prog-bar { height: 100%; border-radius: 4px; transition: width .25s; background: var(--accent); }
+    .prog-bar.stable { background: var(--accent2); }
+    .setup-msg { font-size: .88rem; font-weight: 500; min-height: 1.3em; color: var(--warn); }
+    .setup-msg.ok   { color: var(--accent2); }
+    .setup-msg.idle { color: var(--dim); }
+
+    /* ═══ 준비 완료 뱃지 ═══ */
+    #readyBadge {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center; pointer-events: none;
+    }
+    #readyBadge.hidden { display: none; }
+    .ready-badge-inner {
+      background: rgba(0,255,136,.15); border: 2px solid var(--accent2);
+      border-radius: 20px; padding: 20px 36px; text-align: center;
+      animation: popIn .35s ease;
+    }
+    .r-icon { font-size: 2.4rem; }
+    .r-text { font-size: 1.15rem; font-weight: 700; color: var(--accent2); margin-top: 6px; }
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(.8); }
+      to   { opacity: 1; transform: scale(1); }
+    }
+
+    /* ═══ 카운터 오버레이 ═══ */
+    #countOverlay {
+      position: absolute; top: 12px; right: 12px;
+      background: rgba(0,0,0,.8); border: 2px solid var(--accent);
+      border-radius: 14px; padding: 10px 18px; text-align: center; pointer-events: none;
+    }
+    #countOverlay .num { font-size: 3.4rem; font-weight: 900; color: var(--accent2); line-height: 1; }
+    #countOverlay .lbl { font-size: .7rem; color: var(--dim); margin-top: 2px; }
+    #countOverlay.hidden { display: none; }
+    #pauseBanner {
+      position: absolute; bottom: 12px; left: 50%; transform: translateX(-50%);
+      background: rgba(255,68,68,.88); padding: 8px 20px;
+      border-radius: 20px; font-size: .85rem; font-weight: 600; pointer-events: none;
+      white-space: nowrap;
+    }
+    #pauseBanner.hidden { display: none; }
+
+    /* ═══ 패널 공통 ═══ */
+    .panel {
+      background: var(--surface); padding: 14px 16px;
+      border-bottom: 1px solid #1e1e1e;
+    }
+    @media (min-width: 640px) {
+      .panel { border-radius: var(--radius); border-bottom: none; }
+    }
+
+    /* ═══ 관절 상태 패널 ═══ */
+    #jointPanel.hidden { display: none; }
+    .joint-panel-label { font-size: .72rem; color: var(--dim); font-weight: 600;
+                         letter-spacing: .04em; margin-bottom: 10px; }
+    .joint-tags { display: flex; flex-wrap: wrap; gap: 8px; }
+    .joint-tag {
+      padding: 6px 14px; border-radius: 20px;
+      font-size: .82rem; font-weight: 600;
+      display: flex; align-items: center; gap: 5px;
+      transition: background .25s, color .25s, border-color .25s;
+    }
+    .joint-tag.ok  { background: rgba(0,255,136,.12); color: var(--accent2); border: 1px solid rgba(0,255,136,.3); }
+    .joint-tag.bad { background: rgba(255,68,68,.12);  color: var(--danger);  border: 1px solid rgba(255,68,68,.3); }
+    .joint-tag.wait{ background: var(--surface2);       color: var(--dim);     border: 1px solid #333; }
+
+    /* ═══ 점수 바 ═══ */
+    #scoreRow { display: flex; align-items: center; gap: 10px; }
+    #scoreRow.hidden { display: none; }
+    #scoreLabel { font-size: .78rem; color: var(--dim); width: 55px; }
+    #scorePct   { font-size: .78rem; color: var(--dim); width: 36px; text-align: right; }
+    #scoreRow .prog-wrap { background: #2a2a2a; }
+
+    /* ═══ 운동 선택 ═══ */
+    #selectPanel.hidden { display: none; }
+    #selectPanel h2 { font-size: .85rem; color: var(--dim); margin-bottom: 3px; }
+    .equipment-name { font-size: 1.25rem; font-weight: 700; color: var(--accent); margin-bottom: 14px; }
+    .exercise-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    @media (min-width: 480px) {
+      .exercise-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+    }
+    .exercise-card {
+      background: var(--surface2); border: 2px solid transparent;
+      border-radius: 12px; padding: 18px 10px; text-align: center;
+      cursor: pointer;
+      /* 탭 반응 */
+      -webkit-tap-highlight-color: transparent;
+      active-background: var(--surface);
+      transition: border-color .15s, transform .1s;
+    }
+    .exercise-card:active { transform: scale(.96); border-color: var(--accent); }
+    @media (hover: hover) {
+      .exercise-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    }
+    .card-emoji { font-size: 2rem; }
+    .card-name  { margin-top: 8px; font-size: .84rem; font-weight: 600; }
+
+    /* ═══ 하단 고정 컨트롤 바 ═══ */
+    .controls {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 20;
+      background: var(--surface);
+      border-top: 1px solid #2a2a2a;
+      padding: 10px 14px;
+      padding-bottom: calc(10px + var(--safe-bottom));
+      display: flex; gap: 8px;
+    }
+    @media (min-width: 640px) {
+      .controls { max-width: 900px; left: 50%; transform: translateX(-50%); border-radius: var(--radius) var(--radius) 0 0; }
+    }
+    button {
+      flex: 1; padding: 0 10px;
+      height: 46px;
+      border: none; border-radius: 10px;
+      font-size: .82rem; font-weight: 700;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: opacity .15s, transform .1s;
+    }
+    button:active:not(:disabled) { transform: scale(.95); opacity: .8; }
+    @media (hover: hover) {
+      button:hover:not(:disabled) { opacity: .82; }
+    }
+    button:disabled { opacity: .32; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #000; }
+    .btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid #3a3a3a; }
+    .btn-danger  { background: var(--danger); color: #fff; }
+
+    /* ═══ 데스크톱 레이아웃 ═══ */
+    @media (min-width: 640px) {
+      body { align-items: center; }
+      main { width: 100%; max-width: 900px; }
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>PoseRAC Real-Time Exercise Counter</h1>
-            <p>Real-time exercise recognition and repetition counting</p>
-        </div>
 
-        <div class="main-content">
-            <div class="video-section">
-                <h3>Camera Feed</h3>
-                <video id="video" autoplay style="display: none;"></video>
-                <canvas id="videoCanvas"></canvas>
-                
-                <div class="controls">
-                    <button id="startBtn" onclick="startCamera()">Start Camera</button>
-                    <button id="stopBtn" onclick="stopCamera()" disabled>Stop Camera</button>
-                    <button id="resetBtn" onclick="resetCounter()">Reset Counter</button>
-                </div>
-                
-                <div id="status" class="status disconnected">
-                    Disconnected from backend
-                </div>
+<header>
+  <span>🏋️</span>
+  <h1>GymAI Rep Counter</h1>
+  <div class="phase-badge" id="phaseBadge">대기</div>
+</header>
 
-                <div class="instructions">
-                    <h4>Instructions:</h4>
-                    <ul>
-                        <li>Click "Start Camera" to begin</li>
-                        <li>Position yourself so your full body is visible</li>
-                        <li>Start exercising - the system will detect and count automatically</li>
-                        <li>Use "Reset Counter" to start over</li>
-                    </ul>
-                </div>
-            </div>
+<main>
+  <!-- ── 카메라 ── -->
+  <div class="camera-wrap">
+    <canvas id="localCanvas"></canvas>
+    <canvas id="serverCanvas"></canvas>
 
-            <div class="stats-section">
-                <h3>Live Results</h3>
-                
-                <div class="stat-item">
-                    <div class="stat-label">Exercise Type</div>
-                    <div id="exerciseType" class="stat-value">Unknown</div>
-                </div>
-                
-                <div class="stat-item">
-                    <div class="stat-label">Repetition Count</div>
-                    <div id="repCount" class="stat-value">0</div>
-                </div>
-                
-                <div class="stat-item">
-                    <div class="stat-label">Confidence</div>
-                    <div id="confidence" class="stat-value">0%</div>
-                </div>
-                
-                <div class="stat-item">
-                    <div class="stat-label">Connection Status</div>
-                    <div id="connectionStatus" class="stat-value">Disconnected</div>
-                </div>
-
-                <div class="instructions">
-                    <h4>Supported Exercises:</h4>
-                    <ul>
-                        <li>Push-ups</li>
-                        <li>Squats</li>
-                        <li>Jump Jacks</li>
-                        <li>Pull-ups</li>
-                        <li>Sit-ups</li>
-                        <li>Bench Press</li>
-                        <li>Deadlifts</li>
-                        <li>Front Raises</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
+    <!-- 장비 감지 오버레이 -->
+    <div class="overlay" id="detectingOverlay">
+      <div class="spinner"></div>
+      <div class="overlay-title">헬스 기구를 감지하고 있습니다</div>
+      <div class="detect-dots">
+        <span id="dot0"></span><span id="dot1"></span><span id="dot2"></span>
+      </div>
+      <div class="overlay-sub">기구를 카메라에 잘 보이게 비춰주세요</div>
     </div>
 
-    <script>
-        let video = document.getElementById('video');
-        let canvas = document.getElementById('videoCanvas');
-        let ctx = canvas.getContext('2d');
-        let ws = null;
-        let stream = null;
-        let isStreaming = false;
+    <!-- 셋업 단계 관절 감지 피드백 -->
+    <div id="setupOverlay" class="hidden">
+      <div class="setup-bottom">
+        <div class="setup-title-row">
+          <span class="setup-ex-name" id="setupExName">—</span>
+          <span class="setup-hint">감지되면 자동 시작</span>
+        </div>
+        <div class="setup-bars">
+          <div class="bar-row">
+            <span class="bar-lbl">관절 감지</span>
+            <div class="prog-wrap"><div class="prog-bar" id="setupVisBar" style="width:0%"></div></div>
+            <span class="bar-pct" id="setupVisPct">—</span>
+          </div>
+          <div class="bar-row">
+            <span class="bar-lbl">안정화</span>
+            <div class="prog-wrap"><div class="prog-bar stable" id="setupStableBar" style="width:0%"></div></div>
+            <span class="bar-pct" id="setupStablePct">—</span>
+          </div>
+        </div>
+        <div class="setup-msg idle" id="setupMsg">카메라를 조정하면 자동으로 시작됩니다</div>
+      </div>
+    </div>
 
-        // Set canvas size
-        canvas.width = 640;
-        canvas.height = 480;
+    <!-- 준비 완료 뱃지 -->
+    <div id="readyBadge" class="hidden">
+      <div class="ready-badge-inner">
+        <div class="r-icon">✅</div>
+        <div class="r-text">시작합니다!</div>
+      </div>
+    </div>
 
-        function connectWebSocket() {
-            try {
-                // Use current host for WebSocket connection
-                const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                const host = window.location.hostname;
-                const port = '8000';
-                const wsUrl = `${protocol}//${host}:${port}/ws/real_time`;
-                console.log('Connecting to WebSocket:', wsUrl);
-                ws = new WebSocket(wsUrl);
-                
-                ws.onopen = function(event) {
-                    console.log('Connected to WebSocket');
-                    updateStatus('connected', 'Connected');
-                    document.getElementById('connectionStatus').textContent = 'Connected';
-                };
-                
-                ws.onmessage = function(event) {
-                    const data = JSON.parse(event.data);
-                    if (data.type === 'result') {
-                        // Update stats
-                        document.getElementById('exerciseType').textContent = 
-                            data.exercise.replace('_', ' ').toUpperCase();
-                        document.getElementById('repCount').textContent = data.count;
-                        document.getElementById('confidence').textContent = 
-                            Math.round(data.confidence * 100) + '%';
-                        
-                        // Display processed frame
-                        if (data.frame) {
-                            const img = new Image();
-                            img.onload = function() {
-                                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                            };
-                            img.src = 'data:image/jpeg;base64,' + data.frame;
-                        }
-                    }
-                };
-                
-                ws.onclose = function(event) {
-                    console.log('WebSocket connection closed');
-                    updateStatus('disconnected', 'Disconnected');
-                    document.getElementById('connectionStatus').textContent = 'Disconnected';
-                };
-                
-                ws.onerror = function(error) {
-                    console.error('WebSocket error:', error);
-                    updateStatus('disconnected', 'Connection Error');
-                };
-            } catch (error) {
-                console.error('Failed to connect WebSocket:', error);
-                updateStatus('disconnected', 'Connection Failed');
-            }
-        }
+    <!-- 카운팅 오버레이 -->
+    <div id="countOverlay" class="hidden">
+      <div class="num" id="countNum">0</div>
+      <div class="lbl"  id="countLbl">횟수</div>
+    </div>
+    <div id="pauseBanner" class="hidden">⏸ 자세 확인</div>
+  </div>
 
-        function updateStatus(status, message) {
-            const statusDiv = document.getElementById('status');
-            statusDiv.className = `status ${status}`;
-            statusDiv.textContent = message;
-        }
+  <!-- ── 관절 상태 칩 ── -->
+  <div id="jointPanel" class="panel hidden">
+    <div class="joint-panel-label">필수 관절 감지 현황</div>
+    <div class="joint-tags" id="jointTags"></div>
+  </div>
 
-        async function startCamera() {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { width: 640, height: 480 } 
-                });
-                video.srcObject = stream;
-                
-                video.onloadedmetadata = function() {
-                    video.play();
-                    isStreaming = true;
-                    processFrames();
-                    
-                    document.getElementById('startBtn').disabled = true;
-                    document.getElementById('stopBtn').disabled = false;
-                };
+  <!-- ── 점수 바 ── -->
+  <div id="scoreRow" class="panel hidden">
+    <span id="scoreLabel">포즈 점수</span>
+    <div class="prog-wrap"><div class="prog-bar" id="scoreBarFill" style="width:0%"></div></div>
+    <span id="scorePct">0%</span>
+  </div>
 
-                // Connect to WebSocket
-                connectWebSocket();
+  <!-- ── 운동 선택 ── -->
+  <div id="selectPanel" class="panel hidden">
+    <h2>감지된 기구</h2>
+    <div class="equipment-name" id="equipmentName">—</div>
+    <div class="exercise-grid" id="exerciseGrid"></div>
+  </div>
+</main>
 
-            } catch (error) {
-                console.error('Error accessing camera:', error);
-                alert('Could not access camera. Please make sure you have granted camera permissions.');
-            }
-        }
+<!-- ── 하단 고정 컨트롤 바 ── -->
+<div class="controls">
+  <button class="btn-primary" id="startBtn"   onclick="startCamera()">▶ 시작</button>
+  <button class="btn-ghost"   id="resetBtn"   onclick="resetCount()"     disabled>↺ 초기화</button>
+  <button class="btn-ghost"   id="restartBtn" onclick="restartSession()" disabled>⟳ 처음부터</button>
+  <button class="btn-danger"  id="stopBtn"    onclick="stopCamera()"     disabled>■ 중지</button>
+</div>
 
-        function stopCamera() {
-            isStreaming = false;
-            
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                stream = null;
-            }
-            
-            if (ws) {
-                ws.close();
-                ws = null;
-            }
-            
-            // Clear canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#fff';
-            ctx.font = '20px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('Camera Stopped', canvas.width/2, canvas.height/2);
-            
-            document.getElementById('startBtn').disabled = false;
-            document.getElementById('stopBtn').disabled = true;
-            
-            // Reset stats
-            document.getElementById('exerciseType').textContent = 'Unknown';
-            document.getElementById('repCount').textContent = '0';
-            document.getElementById('confidence').textContent = '0%';
-        }
+<video id="video" autoplay playsinline muted style="display:none"></video>
 
-        function resetCounter() {
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type: 'reset' }));
-            }
-            
-            // Reset display
-            document.getElementById('exerciseType').textContent = 'Unknown';
-            document.getElementById('repCount').textContent = '0';
-            document.getElementById('confidence').textContent = '0%';
-        }
+<script>
+// ═══════════════════════════════════════════════════════════════
+// 상수
+// ═══════════════════════════════════════════════════════════════
+const EXERCISE_NAMES = {
+  squat:'스쿼트', push_up:'푸시업', bench_pressing:'벤치프레스',
+  pull_up:'풀업', front_raise:'프론트 레이즈', situp:'싯업', jump_jack:'점핑잭',
+};
+const EXERCISE_EMOJI = {
+  squat:'🦵', push_up:'💪', bench_pressing:'🏋️',
+  pull_up:'🔝', front_raise:'🙆', situp:'🧘', jump_jack:'🤸',
+};
+const EQUIPMENT_NAMES = {
+  bench_press:'벤치프레스 랙', pull_up_bar:'철봉', dumbbell:'덤벨 / 바벨',
+  squat_rack:'스쿼트 랙', floor:'바닥 / 매트', unknown:'기구 미감지',
+};
+const JOINT_KO = {
+  shoulder:'어깨', elbow:'팔꿈치', wrist:'손목',
+  hip:'엉덩이', knee:'무릎', ankle:'발목',
+};
+const EXERCISE_JOINTS = {
+  squat:          ['hip','knee','ankle'],
+  push_up:        ['shoulder','elbow','wrist','hip'],
+  bench_pressing: ['shoulder','elbow','wrist'],
+  pull_up:        ['shoulder','elbow','hip'],
+  front_raise:    ['shoulder','elbow','wrist'],
+  situp:          ['shoulder','hip','knee'],
+  jump_jack:      ['shoulder','elbow','wrist','hip','knee','ankle'],
+};
+const EXERCISE_TTS = {
+  squat:          '스쿼트를 선택하셨습니다. 측면에서 하체 전체가 보이도록 카메라를 고정해주세요.',
+  push_up:        '푸시업을 선택하셨습니다. 측면에서 어깨와 엉덩이가 보이도록 카메라를 고정해주세요.',
+  bench_pressing: '벤치프레스를 선택하셨습니다. 측면에서 팔 전체가 보이도록 카메라를 고정해주세요.',
+  pull_up:        '풀업을 선택하셨습니다. 정면에서 어깨와 엉덩이가 보이도록 카메라를 고정해주세요.',
+  front_raise:    '프론트 레이즈를 선택하셨습니다. 정면에서 팔 전체가 보이도록 카메라를 고정해주세요.',
+  situp:          '싯업을 선택하셨습니다. 측면에서 어깨부터 무릎까지 보이도록 카메라를 고정해주세요.',
+  jump_jack:      '점핑잭을 선택하셨습니다. 정면에서 전신이 보이도록 카메라를 충분히 뒤로 이동해주세요.',
+};
 
-        function processFrames() {
-            if (!isStreaming || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-                if (isStreaming) {
-                    setTimeout(processFrames, 100);
-                }
-                return;
-            }
+// ═══════════════════════════════════════════════════════════════
+// 오디오
+// ═══════════════════════════════════════════════════════════════
+let audioCtx = null;
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+function beep(freq, dur, type = 'sine', vol = 0.25) {
+  try {
+    const ctx = getAudio(); const osc = ctx.createOscillator(); const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = type; osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    osc.start(); osc.stop(ctx.currentTime + dur);
+  } catch(e) {}
+}
+function playReady()   { beep(523,.12); setTimeout(()=>beep(659,.12),130); setTimeout(()=>beep(784,.3),260); }
+function playRep()     { beep(880,.08,'sine',.18); }
+function playWarning() { beep(220,.3,'sawtooth',.12); }
+function playTick()    { beep(1400,.04,'sine',.07); }
 
-            // Draw video frame to canvas
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // Send frame to backend if WebSocket is connected
-            if (ws && ws.readyState === WebSocket.OPEN) {
-                canvas.toBlob(function(blob) {
-                    const reader = new FileReader();
-                    reader.onload = function() {
-                        const base64 = reader.result.split(',')[1];
-                        ws.send(JSON.stringify({
-                            type: 'frame',
-                            data: base64
-                        }));
-                    };
-                    reader.readAsDataURL(blob);
-                }, 'image/jpeg', 0.8);
-            }
+// ═══════════════════════════════════════════════════════════════
+// TTS
+// ═══════════════════════════════════════════════════════════════
+let lastSpokenText = '', lastSpokenTime = 0;
+const TTS_COOLDOWN = 4000;
+function speak(text, force = false) {
+  if (!window.speechSynthesis || !text) return;
+  const now = Date.now();
+  if (!force && text === lastSpokenText && now - lastSpokenTime < TTS_COOLDOWN) return;
+  window.speechSynthesis.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = 'ko-KR'; utt.rate = 1.0; utt.pitch = 1.0;
+  window.speechSynthesis.speak(utt);
+  lastSpokenText = text; lastSpokenTime = now;
+}
 
-            // Process next frame
-            if (isStreaming) {
-                setTimeout(processFrames, 100); // ~10 FPS
-            }
-        }
+// ═══════════════════════════════════════════════════════════════
+// 상태
+// ═══════════════════════════════════════════════════════════════
+const video        = document.getElementById('video');
+const localCanvas  = document.getElementById('localCanvas');
+const serverCanvas = document.getElementById('serverCanvas');
+const localCtx     = localCanvas.getContext('2d');
+const serverCtx    = serverCanvas.getContext('2d');
+localCanvas.width  = serverCanvas.width  = 640;
+localCanvas.height = serverCanvas.height = 480;
 
-        // Initialize
-        updateStatus('disconnected', 'Click Start Camera to begin');
-    </script>
+let ws = null, stream = null, isStreaming = false;
+let currentPhase = 'idle', sendInterval = null;
+let selectedExercise = null;
+let prevPaused = false, prevCount = 0, prevVisPct = 0, prevMsgText = '';
+
+// ═══════════════════════════════════════════════════════════════
+// 카메라
+// ═══════════════════════════════════════════════════════════════
+async function startCamera() {
+  try {
+    // 모바일 후면 카메라 우선 시도
+    const constraints = {
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 }, height: { ideal: 720 },
+      }
+    };
+    try {
+      stream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    }
+    video.srcObject = stream;
+    video.onloadedmetadata = () => {
+      // 실제 해상도로 캔버스 맞춤
+      const w = video.videoWidth, h = video.videoHeight;
+      localCanvas.width = serverCanvas.width = w;
+      localCanvas.height = serverCanvas.height = h;
+      video.play(); isStreaming = true;
+      drawLocalLoop(); connectWS();
+      setBtn('startBtn', true); setBtn('stopBtn', false);
+    };
+  } catch(e) { alert('카메라 접근 권한이 필요합니다.\n설정에서 카메라 허용 후 다시 시도해주세요.'); }
+}
+
+function stopCamera() {
+  isStreaming = false; clearInterval(sendInterval);
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (ws) { ws.close(); ws = null; }
+  setPhase('idle');
+  setBtn('startBtn', false); setBtn('stopBtn', true);
+  setBtn('resetBtn', true);  setBtn('restartBtn', true);
+}
+
+function drawLocalLoop() {
+  if (!isStreaming) return;
+  if (video.readyState === video.HAVE_ENOUGH_DATA)
+    localCtx.drawImage(video, 0, 0, localCanvas.width, localCanvas.height);
+  requestAnimationFrame(drawLocalLoop);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WebSocket
+// ═══════════════════════════════════════════════════════════════
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const port  = location.port || (location.protocol === 'https:' ? '443' : '80');
+  ws = new WebSocket(`${proto}//${location.hostname}:${port}/ws/exercise`);
+  ws.onopen    = () => { setPhase('detecting'); startDetectSend(); setBtn('restartBtn', false); };
+  ws.onmessage = e  => handleMessage(JSON.parse(e.data));
+  ws.onclose   = () => { clearInterval(sendInterval); };
+  ws.onerror   = e  => console.error('[WS]', e);
+}
+
+function sendFrame() {
+  if (!ws || ws.readyState !== WebSocket.OPEN || !isStreaming) return;
+  // 전송 전 640×480으로 다운스케일 (대역폭 절약)
+  const tmp = document.createElement('canvas');
+  tmp.width = 640; tmp.height = 480;
+  tmp.getContext('2d').drawImage(localCanvas, 0, 0, 640, 480);
+  tmp.toBlob(blob => {
+    const r = new FileReader();
+    r.onload = () => ws.send(JSON.stringify({ type:'frame', data: r.result.split(',')[1] }));
+    r.readAsDataURL(blob);
+  }, 'image/jpeg', 0.65);
+}
+
+function startDetectSend() {
+  clearInterval(sendInterval);
+  sendInterval = setInterval(() => { if (currentPhase === 'detecting') sendFrame(); }, 2000);
+}
+
+function startCountSend() {
+  clearInterval(sendInterval);
+  sendInterval = setInterval(() => {
+    if (currentPhase === 'setup' || currentPhase === 'counting') sendFrame();
+  }, 50);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 메시지 핸들러
+// ═══════════════════════════════════════════════════════════════
+function handleMessage(data) {
+  switch (data.type) {
+    case 'detecting':        updateDetectDots(data.progress); break;
+    case 'equipment_detected': setPhase('selecting'); showEquipmentSelect(data.equipment, data.exercises); break;
+    case 'camera_guide':     if (data.frame) showServerFrame(data.frame); updateSetupFeedback(data); break;
+    case 'counting_ready':   onCountingReady(); break;
+    case 'rep_update':       if (data.frame) showServerFrame(data.frame); updateCount(data); break;
+    case 'reset_confirmed':  prevCount = 0; document.getElementById('countNum').textContent = '0'; break;
+    case 'restarted':
+      selectedExercise = null; prevVisPct = 0; prevMsgText = '';
+      setPhase('detecting'); startDetectSend(); break;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 페이즈 전환
+// ═══════════════════════════════════════════════════════════════
+function setPhase(phase) {
+  currentPhase = phase;
+  const labels = { idle:'대기', detecting:'감지 중', selecting:'운동 선택', setup:'관절 감지 중', counting:'카운팅' };
+  document.getElementById('phaseBadge').textContent = labels[phase] || phase;
+
+  show('detectingOverlay', phase === 'detecting');
+  show('selectPanel',      phase === 'selecting');
+  show('setupOverlay',     phase === 'setup');
+  show('jointPanel',       phase === 'setup');
+  show('readyBadge',       false);
+  show('countOverlay',     phase === 'counting');
+  show('scoreRow',         phase === 'counting');
+  show('pauseBanner',      false);
+
+  const useLocal = phase === 'detecting' || phase === 'selecting';
+  localCanvas.style.display  = useLocal ? 'block' : 'none';
+  serverCanvas.style.display = useLocal ? 'none'  : 'block';
+
+  setBtn('resetBtn',   phase === 'counting');
+  setBtn('restartBtn', phase !== 'idle');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// UI 업데이트
+// ═══════════════════════════════════════════════════════════════
+function updateDetectDots(progress) {
+  const n = Math.round(progress * 3);
+  for (let i = 0; i < 3; i++)
+    document.getElementById(`dot${i}`).classList.toggle('active', i < n);
+}
+
+function showEquipmentSelect(equipment, exercises) {
+  document.getElementById('equipmentName').textContent =
+    (equipment === 'unknown' ? '❓' : '✅') + '  ' + (EQUIPMENT_NAMES[equipment] || equipment);
+  const grid = document.getElementById('exerciseGrid');
+  grid.innerHTML = '';
+  exercises.forEach(ex => {
+    const card = document.createElement('div');
+    card.className = 'exercise-card';
+    card.innerHTML = `<div class="card-emoji">${EXERCISE_EMOJI[ex]||'🏃'}</div>
+                      <div class="card-name">${EXERCISE_NAMES[ex]||ex}</div>`;
+    card.onclick = () => onExerciseClick(ex);
+    grid.appendChild(card);
+  });
+}
+
+function onExerciseClick(exercise) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  selectedExercise = exercise;
+  prevVisPct = 0; prevMsgText = '';
+
+  ws.send(JSON.stringify({ type: 'select_exercise', exercise }));
+  document.getElementById('countLbl').textContent = EXERCISE_NAMES[exercise] || exercise;
+  document.getElementById('setupExName').textContent =
+    (EXERCISE_EMOJI[exercise]||'') + ' ' + (EXERCISE_NAMES[exercise]||exercise);
+
+  setBar('setupVisBar', 0); setBar('setupStableBar', 0);
+  document.getElementById('setupVisPct').textContent    = '—';
+  document.getElementById('setupStablePct').textContent = '—';
+  setSetupMsg('카메라를 조정하면 자동으로 시작됩니다', 'idle');
+  renderJointChips(exercise, []);
+
+  setPhase('setup');
+  startCountSend();
+  speak(EXERCISE_TTS[exercise] || '', true);
+}
+
+function updateSetupFeedback(data) {
+  const visPct    = Math.round((data.visible_ratio || 0) * 100);
+  const stablePct = Math.round((data.stable_ratio  || 0) * 100);
+  const missing   = data.missing_joints || [];
+
+  setBar('setupVisBar',    visPct);
+  setBar('setupStableBar', stablePct);
+  document.getElementById('setupVisPct').textContent    = visPct + '%';
+  document.getElementById('setupStablePct').textContent = stablePct + '%';
+
+  if (selectedExercise) renderJointChips(selectedExercise, missing);
+
+  if (visPct > prevVisPct && visPct % 25 === 0) playTick();
+  prevVisPct = visPct;
+
+  const msg = buildSetupMessage(data, missing);
+  setSetupMsg(msg, visPct >= 80 ? 'ok' : '');
+  if (msg && msg !== prevMsgText) { speak(msg); prevMsgText = msg; }
+}
+
+function buildSetupMessage(data, missing) {
+  const visPct = Math.round((data.visible_ratio || 0) * 100);
+  const stPct  = Math.round((data.stable_ratio  || 0) * 100);
+  if (!data.pose_detected) return '카메라 앞에 서주세요.';
+  if (missing.length > 0) {
+    const names = missing.map(j => JOINT_KO[j] || j).join(', ');
+    if (visPct < 40) return data.instruction || `${names}이(가) 보이지 않습니다. 카메라를 조정해주세요.`;
+    return `${names}이(가) 가려져 있습니다. 카메라를 뒤로 이동하거나 각도를 조정해주세요.`;
+  }
+  if (stPct < 100) return `자세를 유지해주세요... (${stPct}%)`;
+  return '';
+}
+
+function renderJointChips(exercise, missingJoints) {
+  const joints = EXERCISE_JOINTS[exercise] || [];
+  const container = document.getElementById('jointTags');
+  if (container.childElementCount !== joints.length) {
+    container.innerHTML = '';
+    joints.forEach(() => container.appendChild(document.createElement('div')));
+  }
+  joints.forEach((joint, i) => {
+    const tag = container.children[i];
+    const isMissing = missingJoints.includes(joint);
+    const isWaiting = missingJoints.length === 0 && prevVisPct === 0;
+    const cls = isWaiting ? 'wait' : (isMissing ? 'bad' : 'ok');
+    tag.className = `joint-tag ${cls}`;
+    tag.textContent = `${isWaiting ? '○' : (isMissing ? '✗' : '✓')} ${JOINT_KO[joint]||joint}`;
+  });
+}
+
+function onCountingReady() {
+  if (selectedExercise) renderJointChips(selectedExercise, []);
+  setBar('setupVisBar', 100); setBar('setupStableBar', 100);
+  document.getElementById('setupVisPct').textContent    = '100%';
+  document.getElementById('setupStablePct').textContent = '100%';
+  setSetupMsg('감지 완료!', 'ok');
+  show('readyBadge', true);
+  playReady();
+  speak('완료! 운동을 시작합니다.', true);
+  setTimeout(() => { show('readyBadge', false); setPhase('counting'); }, 900);
+}
+
+function updateCount(data) {
+  document.getElementById('countNum').textContent = data.count;
+  const pct = Math.round(data.score * 100);
+  setBar('scoreBarFill', pct);
+  document.getElementById('scorePct').textContent = pct + '%';
+  if (data.count > prevCount) { playRep(); prevCount = data.count; }
+  if (data.paused && !prevPaused) {
+    playWarning(); speak('자세를 확인해주세요.');
+  } else if (!data.paused && prevPaused) {
+    speak('계속하세요!');
+  }
+  prevPaused = !!data.paused;
+  show('pauseBanner', !!data.paused);
+}
+
+function showServerFrame(b64) {
+  const img = new Image();
+  img.onload = () => serverCtx.drawImage(img, 0, 0, serverCanvas.width, serverCanvas.height);
+  img.src = 'data:image/jpeg;base64,' + b64;
+}
+
+function resetCount() {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type:'reset' }));
+  prevCount = 0;
+}
+function restartSession() {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type:'restart' }));
+  prevPaused = false; prevCount = 0;
+}
+
+// 유틸
+function show(id, v) { document.getElementById(id).classList.toggle('hidden', !v); }
+function setBtn(id, d){ document.getElementById(id).disabled = d; }
+function setBar(id, p) { document.getElementById(id).style.width = Math.min(Math.max(p,0),100)+'%'; }
+function setSetupMsg(text, state) {
+  const el = document.getElementById('setupMsg');
+  el.textContent = text;
+  el.className = 'setup-msg' + (state ? ' ' + state : '');
+}
+</script>
 </body>
 </html>
