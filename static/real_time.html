@@ -55,7 +55,6 @@
     .camera-wrap {
       position: relative; width: 100%;
       background: #000; aspect-ratio: 4/3;
-      /* 모바일: 전체 너비, 데스크톱: 둥근 모서리 */
     }
     @media (min-width: 640px) {
       main { padding-left: 16px; padding-right: 16px; gap: 14px; }
@@ -67,12 +66,58 @@
       position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
     }
     #serverCanvas { display: none; }
+    #bboxCanvas {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      pointer-events: none;
+    }
 
-    /* ═══ 감지 중 오버레이 ═══ */
+    /* 장비 확인 모달 */
+    #confirmOverlay {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(0,0,0,.72);
+    }
+    #confirmOverlay.hidden { display: none; }
+    .confirm-box {
+      background: var(--surface); border: 2px solid var(--accent);
+      border-radius: 18px; padding: 28px 24px; text-align: center;
+      width: min(320px, 88vw); animation: popIn .3s ease;
+    }
+    .confirm-icon { font-size: 2.6rem; }
+    .confirm-title {
+      font-size: 1.05rem; font-weight: 700; margin: 10px 0 4px;
+      color: var(--text);
+    }
+    .confirm-conf { font-size: .82rem; color: var(--dim); margin-bottom: 20px; }
+    .confirm-btns { display: flex; gap: 10px; }
+    .btn-confirm-yes {
+      flex: 1; height: 46px; border: none; border-radius: 10px;
+      background: var(--accent2); color: #000;
+      font-size: .9rem; font-weight: 700; cursor: pointer;
+    }
+    .btn-confirm-no {
+      flex: 1; height: 46px; border: 1px solid #444; border-radius: 10px;
+      background: var(--surface2); color: var(--text);
+      font-size: .9rem; font-weight: 700; cursor: pointer;
+    }
+
+    /* ═══ 감지 중 안내 (하단 바) ═══ */
+    .detect-guide {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,.85));
+      padding: 28px 16px 14px;
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      pointer-events: none;
+    }
+    .detect-guide.hidden { display: none; }
+    .detect-guide-text { font-size: .88rem; font-weight: 600; color: var(--text); }
+    .detect-guide-sub  { font-size: .76rem; color: var(--dim); }
+
+    /* ═══ LLM 분석 중 오버레이 ═══ */
     .overlay {
       position: absolute; inset: 0; display: flex; flex-direction: column;
       align-items: center; justify-content: center; gap: 14px;
-      background: rgba(0,0,0,.65); pointer-events: none;
+      background: rgba(0,0,0,.72); pointer-events: none;
     }
     .overlay.hidden { display: none; }
     .spinner {
@@ -83,12 +128,6 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .overlay-title { font-size: 1rem; font-weight: 600; }
     .overlay-sub   { font-size: .82rem; color: var(--dim); text-align: center; padding: 0 24px; }
-    .detect-dots { display: flex; gap: 10px; }
-    .detect-dots span {
-      width: 12px; height: 12px; border-radius: 50%;
-      background: #333; transition: background .3s;
-    }
-    .detect-dots span.active { background: var(--accent); }
 
     /* ═══ 셋업 오버레이 ═══ */
     #setupOverlay {
@@ -203,9 +242,7 @@
       background: var(--surface2); border: 2px solid transparent;
       border-radius: 12px; padding: 18px 10px; text-align: center;
       cursor: pointer;
-      /* 탭 반응 */
       -webkit-tap-highlight-color: transparent;
-      active-background: var(--surface);
       transition: border-color .15s, transform .1s;
     }
     .exercise-card:active { transform: scale(.96); border-color: var(--accent); }
@@ -243,6 +280,81 @@
     .btn-primary { background: var(--accent); color: #000; }
     .btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid #3a3a3a; }
     .btn-danger  { background: var(--danger); color: #fff; }
+    .btn-finish  { background: var(--accent2); color: #000; }
+
+    /* ═══ 피드백 패널 ═══ */
+    #feedbackPanel {
+      position: fixed; inset: 0; z-index: 30;
+      background: rgba(0,0,0,.6);
+      display: flex; align-items: flex-end;
+      animation: fadeIn .25s ease;
+    }
+    #feedbackPanel.hidden { display: none; }
+    @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+
+    .feedback-sheet {
+      background: var(--surface); width: 100%;
+      border-radius: 22px 22px 0 0;
+      padding: 0 0 calc(20px + var(--safe-bottom));
+      max-height: 88dvh; display: flex; flex-direction: column;
+      animation: slideUp .35s cubic-bezier(.32,1,.6,1);
+    }
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+    @media (min-width: 640px) {
+      #feedbackPanel { align-items: center; }
+      .feedback-sheet { max-width: 640px; border-radius: 22px; margin-bottom: 40px; }
+    }
+
+    .feedback-handle {
+      width: 40px; height: 4px; background: #3a3a3a;
+      border-radius: 2px; margin: 14px auto 0;
+    }
+    .feedback-header {
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    .feedback-title {
+      font-size: 1rem; font-weight: 700; color: var(--accent);
+    }
+    .feedback-meta {
+      font-size: .78rem; color: var(--dim); margin-top: 4px;
+    }
+
+    .feedback-body {
+      flex: 1; overflow-y: auto; padding: 20px;
+    }
+
+    /* 로딩 상태 */
+    .feedback-loading-wrap {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 14px; padding: 40px 0;
+    }
+    .feedback-loading-wrap .spinner {
+      width: 42px; height: 42px; border: 3px solid #333;
+      border-top-color: var(--accent2); border-radius: 50%;
+      animation: spin .9s linear infinite;
+    }
+    .feedback-loading-text {
+      font-size: .9rem; color: var(--dim); text-align: center;
+    }
+
+    /* 피드백 텍스트 */
+    .feedback-text {
+      font-size: .9rem; line-height: 1.75;
+      color: var(--text); white-space: pre-wrap;
+    }
+    .feedback-error {
+      font-size: .88rem; color: var(--danger);
+      text-align: center; padding: 30px 0;
+    }
+
+    .feedback-actions {
+      display: flex; gap: 10px;
+      padding: 14px 20px 0;
+    }
 
     /* ═══ 데스크톱 레이아웃 ═══ */
     @media (min-width: 640px) {
@@ -264,15 +376,33 @@
   <div class="camera-wrap">
     <canvas id="localCanvas"></canvas>
     <canvas id="serverCanvas"></canvas>
+    <canvas id="bboxCanvas"></canvas>
 
-    <!-- 장비 감지 오버레이 -->
-    <div class="overlay" id="detectingOverlay">
-      <div class="spinner"></div>
-      <div class="overlay-title">헬스 기구를 감지하고 있습니다</div>
-      <div class="detect-dots">
-        <span id="dot0"></span><span id="dot1"></span><span id="dot2"></span>
+    <!-- 장비 확인 모달 -->
+    <div id="confirmOverlay" class="hidden">
+      <div class="confirm-box">
+        <div class="confirm-icon" id="confirmIcon">🏋️</div>
+        <div class="confirm-title" id="confirmTitle">감지된 기구</div>
+        <div class="confirm-conf" id="confirmConf">신뢰도: —</div>
+        <div class="confirm-reason" id="confirmReason" style="font-size:.8rem;color:#aaa;margin-bottom:14px;"></div>
+        <div class="confirm-btns">
+          <button class="btn-confirm-yes" onclick="confirmEquipment()">✓ 맞습니다</button>
+          <button class="btn-confirm-no"  onclick="denyEquipment()">✗ 다시 촬영</button>
+        </div>
       </div>
-      <div class="overlay-sub">기구를 카메라에 잘 보이게 비춰주세요</div>
+    </div>
+
+    <!-- 감지 중 하단 안내 -->
+    <div class="detect-guide" id="detectGuide">
+      <div class="detect-guide-text">📷 기구를 카메라에 비춰주세요</div>
+      <div class="detect-guide-sub">바운딩 박스가 나타나면 촬영 버튼을 누르세요</div>
+    </div>
+
+    <!-- LLM 분석 중 오버레이 -->
+    <div class="overlay hidden" id="analyzingOverlay">
+      <div class="spinner"></div>
+      <div class="overlay-title">AI가 기구를 분석하고 있습니다</div>
+      <div class="overlay-sub">잠시만 기다려주세요...</div>
     </div>
 
     <!-- 셋업 단계 관절 감지 피드백 -->
@@ -338,9 +468,32 @@
 <!-- ── 하단 고정 컨트롤 바 ── -->
 <div class="controls">
   <button class="btn-primary" id="startBtn"   onclick="startCamera()">▶ 시작</button>
+  <button class="btn-primary" id="captureBtn" onclick="captureFrame()" disabled style="background:var(--accent2);color:#000;">📸 촬영</button>
   <button class="btn-ghost"   id="resetBtn"   onclick="resetCount()"     disabled>↺ 초기화</button>
+  <button class="btn-finish"  id="finishBtn"  onclick="finishWorkout()"  disabled>✓ 완료</button>
   <button class="btn-ghost"   id="restartBtn" onclick="restartSession()" disabled>⟳ 처음부터</button>
   <button class="btn-danger"  id="stopBtn"    onclick="stopCamera()"     disabled>■ 중지</button>
+</div>
+
+<!-- ── 피드백 패널 ── -->
+<div id="feedbackPanel" class="hidden">
+  <div class="feedback-sheet">
+    <div class="feedback-handle"></div>
+    <div class="feedback-header">
+      <div class="feedback-title">🏋️ 운동 피드백</div>
+      <div class="feedback-meta" id="feedbackMeta"></div>
+    </div>
+    <div class="feedback-body" id="feedbackBody">
+      <div class="feedback-loading-wrap">
+        <div class="spinner"></div>
+        <div class="feedback-loading-text">AI가 운동 데이터를 분석하고 있습니다<br>잠시만 기다려주세요...</div>
+      </div>
+    </div>
+    <div class="feedback-actions">
+      <button class="btn-ghost"    style="flex:1" onclick="closeFeedback()">✕ 닫기</button>
+      <button class="btn-primary"  style="flex:2" onclick="newWorkout()">▶ 새 운동 시작</button>
+    </div>
+  </div>
 </div>
 
 <video id="video" autoplay playsinline muted style="display:none"></video>
@@ -352,36 +505,68 @@
 const EXERCISE_NAMES = {
   squat:'스쿼트', push_up:'푸시업', bench_pressing:'벤치프레스',
   pull_up:'풀업', front_raise:'프론트 레이즈', situp:'싯업', jump_jack:'점핑잭',
+  deadlift:'데드리프트', leg_press:'레그 프레스', barbell_row:'바벨 로우',
+  lat_pull_down:'랫 풀다운', ohp:'오버헤드 프레스', lunge:'런지',
+  barbell_arm_curl:'바벨 컬', seated_row:'시티드 로우',
+  lateral_raises:'레터럴 레이즈', leg_raises:'레그 레이즈',
 };
 const EXERCISE_EMOJI = {
-  squat:'🦵', push_up:'💪', bench_pressing:'🏋️',
-  pull_up:'🔝', front_raise:'🙆', situp:'🧘', jump_jack:'🤸',
+  squat:'🦵', push_up:'💪', bench_pressing:'🏋️', pull_up:'🔝',
+  front_raise:'🙆', situp:'🧘', jump_jack:'🤸',
+  deadlift:'⬆️', leg_press:'🦿', barbell_row:'↩️', lat_pull_down:'⬇️',
+  ohp:'🙌', lunge:'🚶', barbell_arm_curl:'💪', seated_row:'🚣',
+  lateral_raises:'↔️', leg_raises:'🦵',
 };
 const EQUIPMENT_NAMES = {
   bench_press:'벤치프레스 랙', pull_up_bar:'철봉', dumbbell:'덤벨 / 바벨',
-  squat_rack:'스쿼트 랙', floor:'바닥 / 매트', unknown:'기구 미감지',
+  squat_rack:'스쿼트 랙', lat_machine:'랫 머신', leg_machine:'레그 머신',
+  abs_station:'복근 기구', floor:'바닥 / 매트', unknown:'기구 미감지',
+};
+const EQUIPMENT_EMOJI = {
+  bench_press:'🏋️', pull_up_bar:'🔝', dumbbell:'💪', squat_rack:'🦵',
+  lat_machine:'🔄', leg_machine:'🦿', abs_station:'🧘', floor:'🟩', unknown:'❓',
 };
 const JOINT_KO = {
   shoulder:'어깨', elbow:'팔꿈치', wrist:'손목',
   hip:'엉덩이', knee:'무릎', ankle:'발목',
 };
 const EXERCISE_JOINTS = {
-  squat:          ['hip','knee','ankle'],
-  push_up:        ['shoulder','elbow','wrist','hip'],
-  bench_pressing: ['shoulder','elbow','wrist'],
-  pull_up:        ['shoulder','elbow','hip'],
-  front_raise:    ['shoulder','elbow','wrist'],
-  situp:          ['shoulder','hip','knee'],
-  jump_jack:      ['shoulder','elbow','wrist','hip','knee','ankle'],
+  squat:           ['hip','knee','ankle'],
+  push_up:         ['shoulder','elbow','wrist','hip'],
+  bench_pressing:  ['shoulder','elbow','wrist'],
+  pull_up:         ['shoulder','elbow','hip'],
+  front_raise:     ['shoulder','elbow','wrist'],
+  situp:           ['shoulder','hip','knee'],
+  jump_jack:       ['shoulder','elbow','wrist','hip','knee','ankle'],
+  deadlift:        ['shoulder','hip','knee','ankle'],
+  leg_press:       ['hip','knee','ankle'],
+  barbell_row:     ['shoulder','elbow','hip'],
+  lat_pull_down:   ['shoulder','elbow','wrist'],
+  ohp:             ['shoulder','elbow','wrist'],
+  lunge:           ['hip','knee','ankle'],
+  barbell_arm_curl:['shoulder','elbow','wrist'],
+  seated_row:      ['shoulder','elbow','wrist','hip'],
+  lateral_raises:  ['shoulder','elbow','wrist'],
+  leg_raises:      ['hip','knee','ankle'],
 };
 const EXERCISE_TTS = {
-  squat:          '스쿼트를 선택하셨습니다. 측면에서 하체 전체가 보이도록 카메라를 고정해주세요.',
-  push_up:        '푸시업을 선택하셨습니다. 측면에서 어깨와 엉덩이가 보이도록 카메라를 고정해주세요.',
-  bench_pressing: '벤치프레스를 선택하셨습니다. 측면에서 팔 전체가 보이도록 카메라를 고정해주세요.',
-  pull_up:        '풀업을 선택하셨습니다. 정면에서 어깨와 엉덩이가 보이도록 카메라를 고정해주세요.',
-  front_raise:    '프론트 레이즈를 선택하셨습니다. 정면에서 팔 전체가 보이도록 카메라를 고정해주세요.',
-  situp:          '싯업을 선택하셨습니다. 측면에서 어깨부터 무릎까지 보이도록 카메라를 고정해주세요.',
-  jump_jack:      '점핑잭을 선택하셨습니다. 정면에서 전신이 보이도록 카메라를 충분히 뒤로 이동해주세요.',
+  squat:           '스쿼트를 선택하셨습니다. 측면에서 하체 전체가 보이도록 카메라를 고정해주세요.',
+  push_up:         '푸시업을 선택하셨습니다. 측면에서 어깨와 엉덩이가 보이도록 카메라를 고정해주세요.',
+  bench_pressing:  '벤치프레스를 선택하셨습니다. 측면에서 팔 전체가 보이도록 카메라를 고정해주세요.',
+  pull_up:         '풀업을 선택하셨습니다. 정면에서 어깨와 엉덩이가 보이도록 카메라를 고정해주세요.',
+  front_raise:     '프론트 레이즈를 선택하셨습니다. 정면에서 팔 전체가 보이도록 카메라를 고정해주세요.',
+  situp:           '싯업을 선택하셨습니다. 측면에서 어깨부터 무릎까지 보이도록 카메라를 고정해주세요.',
+  jump_jack:       '점핑잭을 선택하셨습니다. 정면에서 전신이 보이도록 카메라를 충분히 뒤로 이동해주세요.',
+  deadlift:        '데드리프트를 선택하셨습니다. 측면에서 전신이 보이도록 카메라를 고정해주세요.',
+  leg_press:       '레그 프레스를 선택하셨습니다. 측면에서 엉덩이와 다리가 보이도록 카메라를 고정해주세요.',
+  barbell_row:     '바벨 로우를 선택하셨습니다. 측면에서 상체 전체가 보이도록 카메라를 고정해주세요.',
+  lat_pull_down:   '랫 풀다운을 선택하셨습니다. 정면에서 팔 전체가 보이도록 카메라를 고정해주세요.',
+  ohp:             '오버헤드 프레스를 선택하셨습니다. 정면에서 팔 전체가 보이도록 카메라를 고정해주세요.',
+  lunge:           '런지를 선택하셨습니다. 측면에서 전신이 보이도록 카메라를 고정해주세요.',
+  barbell_arm_curl:'바벨 컬을 선택하셨습니다. 정면에서 팔 전체가 보이도록 카메라를 고정해주세요.',
+  seated_row:      '시티드 로우를 선택하셨습니다. 측면에서 상체 전체가 보이도록 카메라를 고정해주세요.',
+  lateral_raises:  '레터럴 레이즈를 선택하셨습니다. 정면에서 양팔이 보이도록 카메라를 고정해주세요.',
+  leg_raises:      '레그 레이즈를 선택하셨습니다. 정면에서 하체 전체가 보이도록 카메라를 고정해주세요.',
 };
 
 // ═══════════════════════════════════════════════════════════════
@@ -411,7 +596,25 @@ function playTick()    { beep(1400,.04,'sine',.07); }
 // TTS
 // ═══════════════════════════════════════════════════════════════
 let lastSpokenText = '', lastSpokenTime = 0;
+let ttsUnlocked = false;
 const TTS_COOLDOWN = 4000;
+
+// 모바일: 첫 사용자 탭 시 빈 utterance로 TTS 초기화
+function unlockTTS() {
+  if (ttsUnlocked || !window.speechSynthesis) return;
+  const utt = new SpeechSynthesisUtterance('');
+  window.speechSynthesis.speak(utt);
+  ttsUnlocked = true;
+}
+document.addEventListener('touchstart', unlockTTS, { once: true });
+document.addEventListener('click',      unlockTTS, { once: true });
+
+// iOS: speechSynthesis 15초 후 paused 버그 방지
+setInterval(() => {
+  if (!window.speechSynthesis) return;
+  if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+}, 5000);
+
 function speak(text, force = false) {
   if (!window.speechSynthesis || !text) return;
   const now = Date.now();
@@ -429,22 +632,24 @@ function speak(text, force = false) {
 const video        = document.getElementById('video');
 const localCanvas  = document.getElementById('localCanvas');
 const serverCanvas = document.getElementById('serverCanvas');
+const bboxCanvas   = document.getElementById('bboxCanvas');
 const localCtx     = localCanvas.getContext('2d');
 const serverCtx    = serverCanvas.getContext('2d');
-localCanvas.width  = serverCanvas.width  = 640;
-localCanvas.height = serverCanvas.height = 480;
+const bboxCtx      = bboxCanvas.getContext('2d');
+localCanvas.width  = serverCanvas.width  = bboxCanvas.width  = 640;
+localCanvas.height = serverCanvas.height = bboxCanvas.height = 480;
 
 let ws = null, stream = null, isStreaming = false;
 let currentPhase = 'idle', sendInterval = null;
 let selectedExercise = null;
 let prevPaused = false, prevCount = 0, prevVisPct = 0, prevMsgText = '';
+let pendingEquipment = null;
 
 // ═══════════════════════════════════════════════════════════════
 // 카메라
 // ═══════════════════════════════════════════════════════════════
 async function startCamera() {
   try {
-    // 모바일 후면 카메라 우선 시도
     const constraints = {
       video: {
         facingMode: { ideal: 'environment' },
@@ -458,10 +663,9 @@ async function startCamera() {
     }
     video.srcObject = stream;
     video.onloadedmetadata = () => {
-      // 실제 해상도로 캔버스 맞춤
       const w = video.videoWidth, h = video.videoHeight;
-      localCanvas.width = serverCanvas.width = w;
-      localCanvas.height = serverCanvas.height = h;
+      localCanvas.width = serverCanvas.width = bboxCanvas.width = w;
+      localCanvas.height = serverCanvas.height = bboxCanvas.height = h;
       video.play(); isStreaming = true;
       drawLocalLoop(); connectWS();
       setBtn('startBtn', true); setBtn('stopBtn', false);
@@ -492,7 +696,7 @@ function connectWS() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const port  = location.port || (location.protocol === 'https:' ? '443' : '80');
   ws = new WebSocket(`${proto}//${location.hostname}:${port}/ws/exercise`);
-  ws.onopen    = () => { setPhase('detecting'); startDetectSend(); setBtn('restartBtn', false); };
+  ws.onopen    = () => { setPhase('detecting'); startDetectSend(); setBtn('restartBtn', false); setBtn('captureBtn', false); };
   ws.onmessage = e  => handleMessage(JSON.parse(e.data));
   ws.onclose   = () => { clearInterval(sendInterval); };
   ws.onerror   = e  => console.error('[WS]', e);
@@ -500,7 +704,6 @@ function connectWS() {
 
 function sendFrame() {
   if (!ws || ws.readyState !== WebSocket.OPEN || !isStreaming) return;
-  // 전송 전 640×480으로 다운스케일 (대역폭 절약)
   const tmp = document.createElement('canvas');
   tmp.width = 640; tmp.height = 480;
   tmp.getContext('2d').drawImage(localCanvas, 0, 0, 640, 480);
@@ -513,14 +716,20 @@ function sendFrame() {
 
 function startDetectSend() {
   clearInterval(sendInterval);
-  sendInterval = setInterval(() => { if (currentPhase === 'detecting') sendFrame(); }, 2000);
+  sendInterval = setInterval(() => { if (currentPhase === 'detecting') sendFrame(); }, 300);
+}
+
+function captureFrame() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: 'capture' }));
+  setBtn('captureBtn', true);
 }
 
 function startCountSend() {
   clearInterval(sendInterval);
   sendInterval = setInterval(() => {
     if (currentPhase === 'setup' || currentPhase === 'counting') sendFrame();
-  }, 50);
+  }, 60);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -528,15 +737,70 @@ function startCountSend() {
 // ═══════════════════════════════════════════════════════════════
 function handleMessage(data) {
   switch (data.type) {
-    case 'detecting':        updateDetectDots(data.progress); break;
-    case 'equipment_detected': setPhase('selecting'); showEquipmentSelect(data.equipment, data.exercises); break;
-    case 'camera_guide':     if (data.frame) showServerFrame(data.frame); updateSetupFeedback(data); break;
+    case 'detecting':
+      drawBboxes(data.bboxes || []);
+      break;
+
+    case 'analyzing':
+      show('analyzingOverlay', true);
+      show('detectGuide', false);
+      break;
+
+    case 'equipment_detected':
+      show('analyzingOverlay', false);
+      pendingEquipment = data.equipment;
+      drawBboxes(data.bboxes || []);
+      showConfirmModal(data.equipment, data.confidence, data.display_name, data.reason);
+      setPhase('confirming');
+      break;
+
+    case 'confirming':
+      drawBboxes(data.bboxes || []);
+      break;
+
+    case 'equipment_confirmed':
+      setPhase('selecting');
+      showEquipmentSelect(data.equipment, data.exercises);
+      break;
+
+    case 'camera_guide':
+      if (data.frame) showServerFrame(data.frame);
+      updateSetupFeedback(data);
+      break;
+
     case 'counting_ready':   onCountingReady(); break;
-    case 'rep_update':       if (data.frame) showServerFrame(data.frame); updateCount(data); break;
-    case 'reset_confirmed':  prevCount = 0; document.getElementById('countNum').textContent = '0'; break;
+
+    case 'rep_update':
+      if (data.frame) showServerFrame(data.frame);
+      updateCount(data);
+      break;
+
+    case 'reset_confirmed':
+      prevCount = 0;
+      document.getElementById('countNum').textContent = '0';
+      break;
+
     case 'restarted':
+      pendingEquipment = null;
       selectedExercise = null; prevVisPct = 0; prevMsgText = '';
-      setPhase('detecting'); startDetectSend(); break;
+      clearBboxes();
+      show('analyzingOverlay', false);
+      setPhase('detecting'); startDetectSend();
+      setBtn('captureBtn', false);
+      break;
+
+    case 'feedback_loading':
+      setPhase('finishing');
+      showFeedbackPanel(null);
+      break;
+
+    case 'feedback_ready':
+      showFeedbackPanel(data);
+      break;
+
+    case 'feedback_error':
+      showFeedbackPanel({ error: data.message });
+      break;
   }
 }
 
@@ -545,33 +809,100 @@ function handleMessage(data) {
 // ═══════════════════════════════════════════════════════════════
 function setPhase(phase) {
   currentPhase = phase;
-  const labels = { idle:'대기', detecting:'감지 중', selecting:'운동 선택', setup:'관절 감지 중', counting:'카운팅' };
+  const labels = {
+    idle:'대기', detecting:'감지 중', confirming:'기구 확인',
+    selecting:'운동 선택', setup:'관절 감지 중', counting:'카운팅',
+    finishing:'피드백 생성 중',
+  };
   document.getElementById('phaseBadge').textContent = labels[phase] || phase;
 
-  show('detectingOverlay', phase === 'detecting');
-  show('selectPanel',      phase === 'selecting');
-  show('setupOverlay',     phase === 'setup');
-  show('jointPanel',       phase === 'setup');
-  show('readyBadge',       false);
-  show('countOverlay',     phase === 'counting');
-  show('scoreRow',         phase === 'counting');
-  show('pauseBanner',      false);
+  show('detectGuide',    phase === 'detecting');
+  show('confirmOverlay', phase === 'confirming');
+  show('selectPanel',    phase === 'selecting');
+  show('setupOverlay',   phase === 'setup');
+  show('jointPanel',     phase === 'setup');
+  show('readyBadge',     false);
+  show('countOverlay',   phase === 'counting');
+  show('scoreRow',       phase === 'counting');
+  show('pauseBanner',    false);
 
-  const useLocal = phase === 'detecting' || phase === 'selecting';
+  const useLocal = ['detecting', 'confirming', 'selecting'].includes(phase);
   localCanvas.style.display  = useLocal ? 'block' : 'none';
   serverCanvas.style.display = useLocal ? 'none'  : 'block';
+  bboxCanvas.style.display   = useLocal ? 'block' : 'none';
 
-  setBtn('resetBtn',   phase === 'counting');
-  setBtn('restartBtn', phase !== 'idle');
+  if (!useLocal) clearBboxes();
+
+  setBtn('captureBtn', phase !== 'detecting');
+  setBtn('resetBtn',   phase !== 'counting');
+  setBtn('finishBtn',  phase !== 'counting');
+  setBtn('restartBtn', phase === 'idle' || phase === 'finishing');
 }
 
 // ═══════════════════════════════════════════════════════════════
 // UI 업데이트
 // ═══════════════════════════════════════════════════════════════
-function updateDetectDots(progress) {
-  const n = Math.round(progress * 3);
-  for (let i = 0; i < 3; i++)
-    document.getElementById(`dot${i}`).classList.toggle('active', i < n);
+// ── bbox 그리기 ──────────────────────────────────────────────────────────
+function drawBboxes(bboxes) {
+  const cw = bboxCanvas.width, ch = bboxCanvas.height;
+  bboxCtx.clearRect(0, 0, cw, ch);
+  if (!bboxes || !bboxes.length) return;
+
+  bboxes.forEach(b => {
+    const [x1n, y1n, x2n, y2n] = b.bbox;
+    const x1 = x1n * cw, y1 = y1n * ch;
+    const bw = (x2n - x1n) * cw, bh = (y2n - y1n) * ch;
+    const arm = Math.min(bw, bh) * 0.18;
+
+    // 안쪽 반투명 오버레이
+    bboxCtx.fillStyle = 'rgba(0, 229, 255, 0.08)';
+    bboxCtx.fillRect(x1, y1, bw, bh);
+
+    // 글로우 + 코너 브래킷
+    bboxCtx.shadowColor  = '#00e5ff';
+    bboxCtx.shadowBlur   = 12;
+    bboxCtx.strokeStyle  = '#00e5ff';
+    bboxCtx.lineWidth    = 2.5;
+    bboxCtx.lineCap      = 'round';
+
+    const corners = [
+      [x1,      y1,      arm,  0,   0,    arm],  // 좌상
+      [x1+bw,   y1,     -arm,  0,   0,    arm],  // 우상
+      [x1,      y1+bh,   arm,  0,   0,   -arm],  // 좌하
+      [x1+bw,   y1+bh,  -arm,  0,   0,   -arm],  // 우하
+    ];
+    corners.forEach(([cx, cy, hx, hy, vx, vy]) => {
+      bboxCtx.beginPath();
+      bboxCtx.moveTo(cx + hx, cy + hy);
+      bboxCtx.lineTo(cx, cy);
+      bboxCtx.lineTo(cx + vx, cy + vy);
+      bboxCtx.stroke();
+    });
+
+    bboxCtx.shadowBlur = 0;
+  });
+}
+function clearBboxes() {
+  bboxCtx.clearRect(0, 0, bboxCanvas.width, bboxCanvas.height);
+}
+
+// ── 장비 확인 모달 ────────────────────────────────────────────────────────
+function showConfirmModal(equipment, confidence, displayName, reason) {
+  const emoji = EQUIPMENT_EMOJI[equipment] || '❓';
+  const name  = displayName || EQUIPMENT_NAMES[equipment] || equipment;
+  document.getElementById('confirmIcon').textContent   = emoji;
+  document.getElementById('confirmTitle').textContent  = `${name} 감지됨`;
+  document.getElementById('confirmConf').textContent   =
+    `신뢰도: ${Math.round((confidence || 0) * 100)}%`;
+  document.getElementById('confirmReason').textContent = reason || '';
+}
+function confirmEquipment() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: 'confirm_equipment' }));
+}
+function denyEquipment() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: 'deny_equipment' }));
 }
 
 function showEquipmentSelect(equipment, exercises) {
@@ -607,7 +938,6 @@ function onExerciseClick(exercise) {
 
   setPhase('setup');
   startCountSend();
-  speak(EXERCISE_TTS[exercise] || '', true);
 }
 
 function updateSetupFeedback(data) {
@@ -627,7 +957,11 @@ function updateSetupFeedback(data) {
 
   const msg = buildSetupMessage(data, missing);
   setSetupMsg(msg, visPct >= 80 ? 'ok' : '');
-  if (msg && msg !== prevMsgText) { speak(msg); prevMsgText = msg; }
+  if (missing.length > 0 && msg && msg !== prevMsgText) {
+    const names = missing.map(j => JOINT_KO[j] || j).join(', ');
+    speak(`${names} 이(가) 안 보입니다`);
+    prevMsgText = msg;
+  }
 }
 
 function buildSetupMessage(data, missing) {
@@ -668,7 +1002,7 @@ function onCountingReady() {
   setSetupMsg('감지 완료!', 'ok');
   show('readyBadge', true);
   playReady();
-  speak('완료! 운동을 시작합니다.', true);
+  speak('자세 확인 완료 운동 시작', true);
   setTimeout(() => { show('readyBadge', false); setPhase('counting'); }, 900);
 }
 
@@ -677,12 +1011,8 @@ function updateCount(data) {
   const pct = Math.round(data.score * 100);
   setBar('scoreBarFill', pct);
   document.getElementById('scorePct').textContent = pct + '%';
-  if (data.count > prevCount) { playRep(); prevCount = data.count; }
-  if (data.paused && !prevPaused) {
-    playWarning(); speak('자세를 확인해주세요.');
-  } else if (!data.paused && prevPaused) {
-    speak('계속하세요!');
-  }
+  if (data.count > prevCount) { playRep(); speak(String(data.count), true); prevCount = data.count; }
+  if (data.paused && !prevPaused) { playWarning(); }
   prevPaused = !!data.paused;
   show('pauseBanner', !!data.paused);
 }
@@ -700,6 +1030,64 @@ function resetCount() {
 function restartSession() {
   if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type:'restart' }));
   prevPaused = false; prevCount = 0;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 운동 완료 & 피드백
+// ═══════════════════════════════════════════════════════════════
+function finishWorkout() {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: 'finish_workout' }));
+  setBtn('finishBtn', true);
+  setBtn('resetBtn', true);
+}
+
+function showFeedbackPanel(data) {
+  const panel = document.getElementById('feedbackPanel');
+  const body  = document.getElementById('feedbackBody');
+  const meta  = document.getElementById('feedbackMeta');
+
+  panel.classList.remove('hidden');
+
+  if (!data) {
+    // 로딩 상태
+    body.innerHTML = `
+      <div class="feedback-loading-wrap">
+        <div class="spinner"></div>
+        <div class="feedback-loading-text">AI가 운동 데이터를 분석하고 있습니다<br>잠시만 기다려주세요...</div>
+      </div>`;
+    meta.textContent = '';
+    return;
+  }
+
+  if (data.error) {
+    body.innerHTML = `<div class="feedback-error">⚠️ ${data.error}</div>`;
+    meta.textContent = '';
+    return;
+  }
+
+  if (!data.success) {
+    body.innerHTML = `<div class="feedback-error">⚠️ ${data.message || '피드백을 생성할 수 없습니다.'}</div>`;
+    meta.textContent = '';
+    return;
+  }
+
+  const exName = EXERCISE_NAMES[selectedExercise] || selectedExercise || '';
+  meta.textContent = `${exName}  |  총 ${data.total_reps}회  |  ${data.sets}세트`;
+  body.innerHTML   = `<div class="feedback-text">${escapeHtml(data.feedback)}</div>`;
+}
+
+function closeFeedback() {
+  document.getElementById('feedbackPanel').classList.add('hidden');
+}
+
+function newWorkout() {
+  document.getElementById('feedbackPanel').classList.add('hidden');
+  restartSession();
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
 // 유틸

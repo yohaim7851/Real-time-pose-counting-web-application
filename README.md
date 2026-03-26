@@ -1,307 +1,261 @@
-# Real-time Pose Estimation Exercise Counter
+# 실시간 운동 반복 횟수 카운팅 웹 애플리케이션
 
-## Project Overview
-
-This project implements a real-time pose estimation system for exercise repetition counting using the PoseRAC (Pose Saliency Transformer for Repetitive Action Counting) model. The system can analyze videos or provide real-time webcam analysis to automatically count exercise repetitions.
-
-## Features
-
-- **Real-time Exercise Recognition**: Live webcam analysis for exercise detection
-- **Video Analysis**: Upload and analyze exercise videos for repetition counting
-- **Multiple Exercise Support**: Supports 9 different exercise types
-- **Web Interface**: User-friendly Streamlit frontend and FastAPI backend
-- **Docker Support**: Containerized deployment for easy setup
-- **WebSocket API**: Real-time communication for live analysis
-
-## Supported Exercises
-
-1. Bench Pressing
-2. Front Raise  
-3. Jump Jack
-4. Pommel Horse
-5. Pull Up
-6. Push Up
-7. Sit Up
-8. Squat
-9. Deadlift
-
-## Architecture
-
-### Core Components
-
-#### 1. Machine Learning Model (`model.py`)
-- **PoseRAC**: Transformer-based model for pose analysis
-- **Architecture**: Uses PyTorch Lightning framework
-- **Features**: 
-  - Transformer encoder with 6 layers
-  - 99-dimensional pose features (33 landmarks × 3 coordinates)
-  - 9 attention heads
-  - Metric learning with triplet loss
-  - Binary classification for pose detection
-
-#### 2. FastAPI Backend (`app.py`)
-- **RESTful API**: Video upload and analysis endpoints
-- **WebSocket Support**: Real-time pose analysis
-- **Exercise Counter Class**: Main processing logic
-- **MediaPipe Integration**: Pose landmark detection
-- **Features**:
-  - Video upload and processing
-  - Real-time webcam analysis
-  - Exercise type classification
-  - Repetition counting with dual-threshold triggers
-
-#### 3. Streamlit Frontend (`streamlit_app.py`)
-- **Web Interface**: User-friendly video upload interface
-- **Real-time Mode**: Camera integration for live analysis
-- **Results Display**: Exercise metrics and repetition counts
-- **Features**:
-  - Video upload and preview
-  - Real-time status monitoring
-  - Exercise instructions and tips
-
-### Configuration
-
-#### Model Configuration (`RepCount_pose_config.yaml`)
-```yaml
-PoseRAC:
-  dim: 99          # Feature dimension
-  heads: 9         # Attention heads
-  enc_layer: 6     # Encoder layers
-  learning_rate: 0.001
-  alpha: 0.01      # Loss combination factor
-
-Action_trigger:
-  enter_threshold: 0.78   # Pose entry threshold
-  exit_threshold: 0.4     # Pose exit threshold
-  momentum: 0.4           # Smoothing factor
-```
-
-## File Structure
-
-### Root Directory
-```
-├── README.md                    # Original project documentation
-├── PROJECT_OVERVIEW.md          # This comprehensive overview
-├── app.py                       # FastAPI backend server
-├── model.py                     # PoseRAC model implementation
-├── streamlit_app.py             # Streamlit web interface
-├── RepCount_pose_config.yaml    # Model and training configuration
-├── all_action.csv               # Exercise label mappings
-├── requirements_web.txt         # Python dependencies
-├── Dockerfile                   # Container configuration
-├── docker-compose.yml           # Docker services setup
-├── docker-compose-external.yml # External network configuration
-├── best_weights_PoseRAC.pth     # Pre-trained model weights
-├── new_weights.pth              # Additional model weights
-├── start.bat                    # Windows startup script
-├── setup_firewall.bat           # Windows firewall configuration
-└── static/                      # Static web assets
-    └── real_time.html           # Real-time interface
-```
-
-### Research Directory (`research/`)
-```
-├── train.py                     # Model training script
-├── eval.py                      # Model evaluation script
-├── pre_train.py                 # Training data preprocessing
-├── pre_test.py                  # Test data preprocessing
-├── inference_and_visualization.py  # Inference with visualization
-├── requirements.txt             # Training dependencies
-├── Roboto-Regular.ttf           # Font for visualizations
-├── lightning_logs/              # Training logs
-└── utils/                       # Utility modules
-    ├── __init__.py
-    ├── annotation_transform.py  # Data annotation utilities
-    ├── generate_csv_label.py    # Label generation
-    └── generate_for_train.py    # Training data generation
-```
-
-## Dependencies
-
-### Core ML Libraries
-- **PyTorch**: Deep learning framework
-- **PyTorch Lightning**: Training framework
-- **MediaPipe**: Pose landmark detection
-- **NumPy**: Numerical computations
-- **OpenCV**: Computer vision operations
-
-### Web Services
-- **FastAPI**: Backend REST API
-- **Streamlit**: Frontend web interface
-- **Uvicorn**: ASGI server
-- **WebSockets**: Real-time communication
-
-### Additional Tools
-- **Pandas**: Data manipulation
-- **PyYAML**: Configuration files
-- **Pillow**: Image processing
-
-## Installation & Setup
-
-### Option 1: Docker (Recommended)
-```bash
-# Build and run with Docker Compose
-docker-compose up --build
-
-# Access services:
-# Frontend: http://localhost:8501
-# Backend API: http://localhost:8000
-```
-
-### Option 2: Local Installation
-```bash
-# Install dependencies
-pip install -r requirements_web.txt
-
-# Start backend
-uvicorn app:app --host 0.0.0.0 --port 8000
-
-# Start frontend (in another terminal)
-streamlit run streamlit_app.py --server.port 8501
-```
-
-## Usage
-
-### Video Analysis
-1. Open the web interface at `http://localhost:8501`
-2. Upload an exercise video (MP4, AVI, MOV, MKV)
-3. Click "Analyze Exercise" to get automatic repetition counting
-4. View results: exercise type, repetition count, and confidence score
-
-### Real-time Analysis
-1. Navigate to the "Real-Time Camera" mode
-2. Connect via WebSocket API at `ws://localhost:8000/ws/real_time`
-3. Send camera frames for live exercise recognition
-4. Receive real-time exercise classification and counting
-
-### API Endpoints
-
-#### REST API
-- `GET /`: Service status
-- `GET /health`: Health check and available exercises
-- `POST /analyze_video`: Upload and analyze video
-- `GET /exercises`: List supported exercises
-- `GET /real_time_status`: Current real-time status
-- `POST /reset_real_time`: Reset counting state
-
-#### WebSocket
-- `ws://localhost:8000/ws/real_time`: Real-time pose analysis
-
-## Model Performance
-
-The PoseRAC model achieves state-of-the-art performance on the RepCount dataset:
-
-| Metric | Value |
-|--------|-------|
-| MAE (Mean Absolute Error) | 0.236 |
-| OBO (Off-By-One accuracy) | 0.560 |
-| Inference Speed | 20ms per frame |
-
-Compared to previous methods:
-- **56% improvement** in OBO metric vs. previous SOTA (TransRAC: 0.291)
-- **10x faster** inference speed
-- **Significantly smaller** model size
-
-## Technical Details
-
-### Pose Processing Pipeline
-1. **Frame Extraction**: Extract frames from video/camera
-2. **Pose Detection**: MediaPipe extracts 33 3D landmarks
-3. **Normalization**: Normalize coordinates to [0,1] range
-4. **Classification**: PoseRAC model predicts exercise probabilities
-5. **Trigger System**: Dual-threshold system counts repetitions
-6. **Smoothing**: Momentum-based smoothing reduces noise
-
-### Action Trigger System
-- **Enter Threshold**: 0.78 (pose must exceed this to enter)
-- **Exit Threshold**: 0.4 (pose must fall below this to exit)
-- **Dual Triggers**: Two complementary triggers per exercise
-- **Hysteresis**: Prevents false counts from prediction jitter
-
-## Configuration Options
-
-### Model Parameters
-- `dim`: Feature dimension (default: 99)
-- `heads`: Number of attention heads (default: 9)
-- `enc_layer`: Transformer encoder layers (default: 6)
-- `learning_rate`: Training learning rate (default: 0.001)
-
-### Trigger Parameters
-- `enter_threshold`: Pose entry threshold (default: 0.78)
-- `exit_threshold`: Pose exit threshold (default: 0.4)
-- `momentum`: Smoothing factor (default: 0.4)
-
-## Deployment
-
-### Production Deployment
-1. **Docker**: Use provided Dockerfile for containerized deployment
-2. **Environment Variables**: Configure `BACKEND_URL` for service discovery
-3. **Resource Requirements**: 
-   - CPU: 2+ cores recommended
-   - RAM: 4GB+ recommended
-   - GPU: Optional but improves performance
-
-### Scaling Considerations
-- **Stateless Design**: Each request is independent
-- **WebSocket Management**: Handle connection lifecycle properly
-- **Model Loading**: Pre-load models to reduce latency
-- **Resource Monitoring**: Monitor CPU/memory usage during inference
-
-## Development
-
-### Adding New Exercises
-1. Update `all_action.csv` with new exercise labels
-2. Collect and annotate training data
-3. Retrain model with new exercise data
-4. Update configuration files
-5. Test with new exercise videos
-
-### Model Training
-```bash
-# Preprocess training data
-python research/pre_train.py --config RepCount_pose_config.yaml
-
-# Train model
-python research/train.py --config RepCount_pose_config.yaml
-
-# Evaluate model
-python research/eval.py --config RepCount_pose_config.yaml --ckpt best_weights_PoseRAC.pth
-```
-
-## Troubleshooting
-
-### Common Issues
-1. **Model weights not found**: Ensure `best_weights_PoseRAC.pth` exists
-2. **Backend connection error**: Check if FastAPI server is running on port 8000
-3. **Pose detection failure**: Ensure good lighting and full body visibility
-4. **Low accuracy**: Try different angles and clearer exercise movements
-
-### Performance Optimization
-- **GPU Acceleration**: Use CUDA-capable GPU for faster inference
-- **Frame Sampling**: Process every Nth frame for better performance
-- **Model Quantization**: Consider model quantization for edge deployment
-- **Batch Processing**: Process multiple frames together when possible
-
-## License & Citation
-
-Based on the PoseRAC research paper:
-```
-@article{yao2023poserac,
-  title={PoseRAC: Pose Saliency Transformer for Repetitive Action Counting},
-  author={Yao, Ziyu and Cheng, Xuxin and Zou, Yuexian},
-  journal={arXiv preprint arXiv:2303.08450},
-  year={2023}
-}
-```
-
-## Contact & Support
-
-For questions or issues:
-- Original Author: Ziyu Yao (yaozy@stu.pku.edu.cn)
-- GitHub Issues: Create issues for bug reports and feature requests
-- Documentation: Refer to README.md for additional details
+웹캠으로 운동 동작을 분석하여 반복 횟수를 자동으로 카운팅하는 실시간 웹 애플리케이션입니다.
+YOLO-World 기반 장비 감지, OpenAI Vision API 기반 장비 분류, MediaPipe + Transformer 기반 포즈 분석을 결합하여 33가지 운동을 지원합니다.
 
 ---
 
-*Last Updated: December 2024*
-*Project Version: 1.0.0*
+## 주요 기능
+
+- **자동 장비 감지**: YOLO-World 모델이 카메라에 비친 헬스 장비를 감지하고, GPT-4o-mini가 장비 종류를 분류합니다.
+- **실시간 포즈 분석**: MediaPipe로 33개 신체 랜드마크를 추출하고, Transformer 기반 PoseRAC 모델로 동작을 분류합니다.
+- **자동 반복 횟수 카운팅**: 이중 트리거 상태머신 + EMA 평활화를 통해 정확한 반복 횟수를 카운팅합니다.
+- **카메라 가이드**: 필수 키포인트 가시성을 실시간으로 확인하고, 최적의 촬영 각도를 안내합니다.
+- **33가지 운동 지원**: 15개 장비 카테고리에 걸쳐 맨몸 운동부터 머신 운동까지 지원합니다.
+
+---
+
+## 기술 스택
+
+| 항목 | 기술 |
+|------|------|
+| 웹 프레임워크 | FastAPI + WebSocket (비동기) |
+| 프론트엔드 | 단일 SPA (HTML/CSS/JS) + WebRTC |
+| 포즈 감지 | MediaPipe Pose (33개 랜드마크) |
+| 동작 분류 | Transformer 기반 PoseRAC (104차원 입력) |
+| 장비 감지 | YOLO-World v2 |
+| 장비 분류 | OpenAI GPT-4o-mini Vision API |
+| 배포 | Docker + Nginx |
+
+---
+
+## 시스템 구조
+
+```
+웹 브라우저 (WebRTC 카메라)
+        │ Base64 프레임 → WebSocket
+        ↓
+FastAPI 서버 (app.py)
+  ├─ detecting  → YOLO-World: 바운딩 박스 감지
+  ├─ capturing  → OpenAI Vision API: 장비 분류
+  ├─ setup      → CameraGuide: 키포인트 가시성 확인
+  └─ counting   → MediaPipe → PoseRAC → Action_trigger: 횟수 카운팅
+        │ JSON 응답
+        ↓
+실시간 UI 업데이트
+```
+
+### 처리 흐름 (Phase)
+
+```
+detecting → confirming → selecting → setup → counting
+```
+
+1. **detecting**: 카메라에서 헬스 장비 바운딩 박스 감지
+2. **confirming**: LLM이 장비 종류 분류 후 사용자 확인
+3. **selecting**: 해당 장비에서 가능한 운동 목록 선택
+4. **setup**: 카메라 각도 및 키포인트 가시성 안내
+5. **counting**: 실시간 반복 횟수 카운팅
+
+---
+
+## 파일 구조
+
+```
+Real-time-pose-counting-web-application/
+├── app.py                      # FastAPI 서버, WebSocket 핸들러
+├── session.py                  # WebSocket 세션 상태 관리
+├── model.py                    # PoseRAC 모델, Action_trigger 정의
+├── pose_counter.py             # MediaPipe 포즈 감지 + 횟수 카운팅
+├── exercise_config.py          # 운동 설정, 장비-운동 매핑
+├── equipment_detector.py       # YOLO-World 기반 장비 감지
+├── camera_guide.py             # 카메라 가이드 (키포인트 가시성)
+├── llm_identifier.py           # OpenAI Vision API 장비 분류
+├── utils.py                    # 유틸리티 함수
+├── requirements_web.txt        # Python 의존성
+├── RepCount_pose_config.yaml   # PoseRAC 모델 설정
+├── best_weights.pth            # PoseRAC 학습된 가중치
+├── yolov8s-worldv2.pt          # YOLO-World 모델 가중치
+├── all_action.csv              # 운동 액션 라벨
+├── static/
+│   └── real_time.html          # 프론트엔드 SPA
+├── Dockerfile
+├── docker-compose.yml
+└── nginx/                      # Nginx 설정 (배포용)
+```
+
+---
+
+## 설치 및 실행
+
+### 요구사항
+
+- Python 3.8 이상 (3.9+ 권장)
+- CUDA 지원 GPU (선택사항, CPU로도 동작)
+- OpenAI API Key (장비 자동 분류 기능 사용 시)
+
+### 1. 환경 설정
+
+```bash
+# 저장소 클론
+git clone <repository-url>
+cd Real-time-pose-counting-web-application
+
+# 가상환경 생성 및 활성화
+conda create -n re-rac python=3.9
+conda activate re-rac
+
+# 의존성 설치
+pip install -r requirements_web.txt
+```
+
+### 2. 환경 변수 설정
+
+`.env` 파일을 생성하고 OpenAI API Key를 설정합니다.
+
+```env
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+> API Key가 없으면 장비 자동 분류 기능이 비활성화되고, 장비를 "unknown"으로 처리합니다.
+
+### 3. 모델 가중치 확인
+
+다음 파일이 프로젝트 루트에 있어야 합니다.
+
+- `best_weights.pth` — PoseRAC 학습 가중치
+- `yolov8s-worldv2.pt` — YOLO-World 모델 가중치
+
+### 4. 실행
+
+```bash
+python app.py
+```
+
+브라우저에서 `http://localhost:8000` 접속
+
+---
+
+## Docker를 이용한 실행
+
+```bash
+# 빌드 및 실행
+docker-compose up --build
+
+# 백그라운드 실행
+docker-compose up -d
+```
+
+---
+
+## 지원 운동 목록
+
+### 모델 학습 운동 (7종)
+
+| 운동명 | 설명 |
+|--------|------|
+| squat | 스쿼트 |
+| push_up | 푸시업 |
+| situp | 싯업 |
+| jump_jack | 점프잭 |
+| pull_up | 풀업 |
+| front_raise | 프론트 레이즈 |
+| bench_pressing | 벤치프레스 |
+
+### 매핑 지원 운동 (26종)
+
+학습된 7가지 운동과 가장 유사한 동작으로 자동 매핑되어 카운팅합니다.
+
+| 분류 | 운동 목록 |
+|------|---------|
+| 맨몸 | lunge, jump_jack |
+| 철봉/딥바 | leg_raises, dip |
+| 바벨 | deadlift, barbell_row, ohp |
+| 레그 머신 | leg_press, leg_curl, leg_extension |
+| 케이블 머신 | cable_fly, cable_curl, cable_pushdown, cable_lateral_raise |
+| 기타 머신 | lat_pull_down, seated_row, pec_deck_fly, machine_ohp |
+| 자유 중량 | lateral_raises, kettlebell_swing, barbell_arm_curl |
+| 유산소/기타 | rowing |
+
+---
+
+## 지원 장비 (15종)
+
+| 장비 | 한글명 |
+|------|--------|
+| bench_press | 벤치프레스 |
+| squat_rack | 스쿼트 랙 |
+| smith_machine | 스미스 머신 |
+| pull_up_bar | 철봉 |
+| dip_bar | 딥 바 |
+| lat_machine | 랫 풀다운 머신 |
+| cable_machine | 케이블 머신 |
+| leg_machine | 레그 머신 |
+| pec_deck | 펙덱 머신 |
+| shoulder_machine | 숄더 머신 |
+| dumbbell | 덤벨 |
+| kettlebell | 케틀벨 |
+| cardio_machine | 유산소 기구 |
+| abs_station | 복근 운동 기구 |
+| floor | 맨바닥 (맨몸 운동) |
+
+---
+
+## 모델 상세
+
+### PoseRAC (Transformer 기반 동작 분류)
+
+- **입력**: 104차원 피처 벡터
+  - 99차원: MediaPipe 33개 랜드마크 xyz 좌표 (정규화)
+  - 5차원: 주요 관절 각도 (팔꿈치, 어깨, 엉덩이, 무릎, 발목)
+- **구조**: TransformerEncoder (6층, 8헤드) + FC Layer
+- **출력**: 0~1 확률값 (동작 수행 여부)
+
+### Action_trigger (반복 횟수 카운팅)
+
+```
+pose_score > 0.717  →  동작 시작 감지
+pose_score < 0.300  →  동작 완료 → 횟수 +1
+```
+
+EMA(지수이동평균, momentum=0.4)로 노이즈를 제거합니다.
+
+---
+
+## 주요 설정값 (RepCount_pose_config.yaml)
+
+```yaml
+PoseRAC:
+  dim: 104              # 입력 피처 차원
+  heads: 8              # Transformer 어텐션 헤드 수
+  enc_layer: 6          # Transformer 인코더 레이어 수
+  learning_rate: 0.001
+
+Action_trigger:
+  enter_threshold: 0.717    # 동작 시작 기준
+  exit_threshold: 0.30      # 동작 완료 기준
+  momentum: 0.4             # EMA 평활화 계수
+```
+
+---
+
+## 문제 해결
+
+### Python 버전 오류 (`TypeError: 'type' object is not subscriptable`)
+
+Python 3.8 이하에서 발생하는 오류입니다. Python 3.9 이상으로 업그레이드하거나,
+`exercise_config.py` 상단에 `from typing import Dict`를 추가하고 `dict[str, str]`을 `Dict[str, str]`로 변경하세요.
+
+### OpenAI API Key 미설정
+
+API Key 없이 실행하면 장비가 자동으로 "unknown"으로 분류되며, 모든 운동이 수동 선택 가능합니다.
+
+### 카메라가 인식되지 않는 경우
+
+브라우저에서 카메라 권한을 허용했는지 확인하세요. HTTPS 또는 localhost 환경에서만 WebRTC가 동작합니다.
+
+---
+
+## 라이선스
+
+본 프로젝트는 연구 및 개인 사용 목적으로 제작되었습니다.

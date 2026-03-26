@@ -1,1 +1,0 @@
-python inference_and_visualization.py --config ./RepCount_pose_config.yaml --ckpt saved_weights/enhanced-epoch=86-val_loss=0.08.ckpt
